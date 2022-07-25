@@ -1,4 +1,4 @@
-const { customEval, Scope } = require('./eval');
+const { customEval, Scope } = require('./src/eval');
 
 const scope = new Scope();
 
