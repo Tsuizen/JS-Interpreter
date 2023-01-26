@@ -7,7 +7,7 @@
 
 ### Install
 ```
-git@github.com:Tsuizen/JS-Interpreter.git
+clone git@github.com:Tsuizen/JS-Interpreter.git
 ```
 ```
 yarn install
