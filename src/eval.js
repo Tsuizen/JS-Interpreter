@@ -120,7 +120,7 @@ function* evaluate(node, scope) {
                   //当yield返回的是一个promise时，放到then里执行，使得yield后面的逻辑要等前面的执行完才行，达到同步效果
                   value.then((data) => next(data));
                 } else {
-                  // 自执行next迭代
+                  // 递归执行next迭代
                   next(value);
                 }
               } catch (exception) {
@@ -790,6 +790,23 @@ function* evaluate(node, scope) {
     }
     // 箭头函数
     case "ArrowFunctionExpression": {
+      const generator = function* (...args) {
+        const generatorScope = new Scope({}, scope, "function");
+        node.params.forEach((p, i) => {
+          generatorScope.declare("let", p.name, args[i]);
+        });
+
+        let gen = evaluate(node.body, generatorScope);
+
+        let rightValue = gen.next();
+        while (!rightValue.done) {
+          rightValue = gen.next(yield rightValue.value);
+        }
+        rightValue = rightValue.value;
+
+        if (rightValue?.type === "return") return rightValue.value;
+        else return rightValue;
+      };
       if (!node.async) {
         return (...args) => {
           const funScope = new Scope({}, scope, "function");

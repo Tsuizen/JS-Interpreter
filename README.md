@@ -1,18 +1,23 @@
-使用JS实现的ES5解释器
+# 使用JS实现的ES5解释器
+
 1. ES5的大部分语法（除for in, with, label语句）
 2. 额外实现的功能
    - generotor函数
    - async函数
    - **
 
-### Install
-```
+## Install
+
+```bash
 git@github.com:Tsuizen/JS-Interpreter.git
 ```
-```
+
+```bash
 yarn install
 ```
-### Usage
+
+## Usage
+
 ```javascript
 const { customEval, Scope } = require('./src/eval');
 
@@ -33,5 +38,7 @@ console.log(func('Tom'));
 
 
 ```
-### 参考资料
-https://github.com/bramblex/jsjs-answer
+
+## 参考资料
+
+<https://github.com/bramblex/jsjs-answer>
