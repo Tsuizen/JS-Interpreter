@@ -1,5 +1,5 @@
-const acorn = require("acorn");
-const Scope = require("./scope");
+const acorn = require('acorn');
+const Scope = require('./scope');
 
 class Signal {
   constructor(type, value) {
@@ -11,27 +11,27 @@ class Signal {
 function* evaluate(node, scope) {
   if (!node) return;
   switch (node.type) {
-    case "Program": {
+    case 'Program': {
       // 先预解析，对var和function变量提升
       for (const expression of node.body) {
-        if (expression.type === "FunctionDeclaration") {
+        if (expression.type === 'FunctionDeclaration') {
           const gen = evaluate.call(this, expression, scope);
           let result = gen.next();
           while (!result.done) {
             result = gen.next(yield result.value);
           }
         } else if (
-          expression.type === "VariableDeclaration" &&
-          expression.kind === "var"
+          expression.type === 'VariableDeclaration' &&
+          expression.kind === 'var'
         ) {
           expression.declarations.forEach((dec) => {
-            scope.declare("var", dec.id.name);
+            scope.declare('var', dec.id.name);
           });
         }
       }
-      
+
       for (const expression of node.body) {
-        if (expression !== "FunctionDeclaration") {
+        if (expression !== 'FunctionDeclaration') {
           const gen = evaluate.call(this, expression, scope);
           let result = gen.next();
           while (!result.done) {
@@ -42,29 +42,29 @@ function* evaluate(node, scope) {
       return;
     }
     // 字面量直接返回
-    case "Literal": {
+    case 'Literal': {
       return node.value;
     }
     // 从scope中根据变量名返回对应值
-    case "Identifier": {
+    case 'Identifier': {
       return scope.get(node.name);
     }
-    case "BlockStatement": {
+    case 'BlockStatement': {
       // 预解析进行变量提升
-      const blockScope = new Scope({}, scope, "block");
+      const blockScope = new Scope({}, scope, 'block');
       for (const expression of node.body) {
-        if (expression.type === "FunctionDeclaration") {
+        if (expression.type === 'FunctionDeclaration') {
           const gen = evaluate.call(this, expression, scope);
           let result = gen.next();
           while (!result.done) {
             result = gen.next(yield result.value);
           }
         } else if (
-          expression.type === "VariableDeclaration" &&
-          expression.kind === "var"
+          expression.type === 'VariableDeclaration' &&
+          expression.kind === 'var'
         )
           expression.declarations?.forEach((d) => {
-            blockScope.declare("var", d.id.name);
+            blockScope.declare('var', d.id.name);
           });
       }
       // 普通作用域
@@ -80,11 +80,11 @@ function* evaluate(node, scope) {
       }
       return result;
     }
-    case "FunctionDeclaration": {
+    case 'FunctionDeclaration': {
       const generator = function* (...args) {
-        const generatorScope = new Scope({}, scope, "function");
+        const generatorScope = new Scope({}, scope, 'function');
         node.params.forEach((p, i) => {
-          generatorScope.declare("let", p.name, args[i]);
+          generatorScope.declare('let', p.name, args[i]);
         });
 
         let gen = evaluate(node.body, generatorScope);
@@ -95,33 +95,30 @@ function* evaluate(node, scope) {
         }
         rightValue = rightValue.value;
 
-        if (rightValue?.type === "return") return rightValue.value;
+        if (rightValue?.type === 'return') return rightValue.value;
         else return rightValue;
       };
       //generator函数
       if (node.generator) {
-        return scope.declare("var", node.id.name, generator);
+        return scope.declare('var', node.id.name, generator);
       }
       // async函数
       if (node.async) {
         const asyncFun = function (...args) {
           return new Promise((resolve, reject) => {
             const gen = generator();
-            const asyncScope = new Scope({}, scope, "function");
+            const asyncScope = new Scope({}, scope, 'function');
             node.params.forEach((param, i) => {
-              asyncScope.declare("let", param.name, args[i]);
+              asyncScope.declare('let', param.name, args[i]);
             });
             function next(data) {
               try {
                 const { done, value } = gen.next(data);
                 if (done) {
                   resolve(value);
-                } else if (value instanceof Promise) {
-                  //当yield返回的是一个promise时，放到then里执行，使得yield后面的逻辑要等前面的执行完才行，达到同步效果
-                  value.then((data) => next(data));
                 } else {
-                  // 递归执行next迭代
-                  next(value);
+                  // 将后面的代码放入微任务队列
+                  Promise.resolve().then((data) => next(data));
                 }
               } catch (exception) {
                 reject(exception);
@@ -130,38 +127,38 @@ function* evaluate(node, scope) {
             next();
           });
         };
-        return scope.declare("var", node.id.name, asyncFun);
+        return scope.declare('var', node.id.name, asyncFun);
       }
       // 普通函数
       const func = function (...args) {
-        const funcScope = new Scope({}, scope, "function");
+        const funcScope = new Scope({}, scope, 'function');
         node.params.forEach((param, i) => {
-          funcScope.declare("let", param.name, args[i]);
+          funcScope.declare('let', param.name, args[i]);
         });
 
         const gen = evaluate.call(this, node.body, funcScope);
         let res = gen.next();
         let result = res.value;
 
-        if (result instanceof Signal && result.type === "return")
+        if (result instanceof Signal && result.type === 'return')
           return result.value;
         return;
       };
-      Object.defineProperty(func, "name", {
+      Object.defineProperty(func, 'name', {
         get() {
           return node.id?.name;
-        },
+        }
       });
-      Object.defineProperty(func, "length", {
+      Object.defineProperty(func, 'length', {
         get() {
           return node.params.length;
-        },
+        }
       });
-      return scope.declare("var", node.id.name, func);
+      return scope.declare('var', node.id.name, func);
     }
 
     // 变量声明
-    case "VariableDeclaration": {
+    case 'VariableDeclaration': {
       for (const dec of node.declarations) {
         const gen = evaluate.call(this, dec.init, scope);
 
@@ -176,7 +173,7 @@ function* evaluate(node, scope) {
       return;
     }
     // 表达式语句(除声明之外的语句)
-    case "ExpressionStatement": {
+    case 'ExpressionStatement': {
       const gen = evaluate.call(this, node.expression, scope);
       let result = gen.next();
       while (!result.done) {
@@ -186,8 +183,8 @@ function* evaluate(node, scope) {
     }
 
     // if语句, 每个consequent包含当前if或者elseif，alternate递归包含后面的elseif/else语句
-    case "IfStatement": {
-      const ifScope = new Scope({}, scope, "block");
+    case 'IfStatement': {
+      const ifScope = new Scope({}, scope, 'block');
       if (evaluate.call(this, node.test, scope).next().value) {
         const gen = evaluate.call(this, node.consequent, ifScope);
         let result = gen.next();
@@ -205,8 +202,8 @@ function* evaluate(node, scope) {
       } else return;
     }
     // 赋值语句
-    case "AssignmentExpression": {
-      if (node.left.type === "Identifier") {
+    case 'AssignmentExpression': {
+      if (node.left.type === 'Identifier') {
         // 当操作符为=，并且未使用var let const 声明时，scope没有存储该变量，因此先执行表达式右侧获得值后使用var定义变量；
         const genRight = evaluate.call(this, node.right, scope);
         let right = genRight.next();
@@ -215,7 +212,7 @@ function* evaluate(node, scope) {
         }
         const rightValue = right.value;
 
-        if (node.operator === "=") scope.set(node.left.name, rightValue);
+        if (node.operator === '=') scope.set(node.left.name, rightValue);
 
         const genLeft = evaluate.call(this, node.left, scope);
         let left = genLeft.next();
@@ -223,26 +220,26 @@ function* evaluate(node, scope) {
           left = genLeft.next(yield left.value);
         }
         const leftValue = left.value;
-        
+
         switch (node.operator) {
-          case "+=":
+          case '+=':
             scope.set(node.left.name, leftValue + rightValue);
             break;
-          case "-=":
+          case '-=':
             scope.set(node.left.name, leftValue - rightValue);
             break;
-          case "/=":
+          case '/=':
             scope.set(node.left.name, leftValue / rightValue);
             break;
-          case "*=":
+          case '*=':
             scope.set(node.left.name, leftValue * rightValue);
             break;
-          case "%=":
+          case '%=':
             scope.set(node.left.name, leftValue % rightValue);
             break;
         }
         return scope.get(node.left.name);
-      } else if (node.left.type === "MemberExpression") {
+      } else if (node.left.type === 'MemberExpression') {
         const genLeft = evaluate.call(this, node.left, scope);
         let left = genLeft.next();
         while (!left.done) {
@@ -253,12 +250,12 @@ function* evaluate(node, scope) {
         leftPropName = node.left.property.name;
 
         let temp = node.left;
-        if (temp?.object?.type === "MemberExpression") {
-          while (temp?.object?.type === "MemberExpression") {
+        if (temp?.object?.type === 'MemberExpression') {
+          while (temp?.object?.type === 'MemberExpression') {
             temp = temp.object;
           }
           leftObj = scope.get(temp.object.name)[temp.property.name];
-        } else if (temp.object.name === "module") {
+        } else if (temp.object.name === 'module') {
           leftObj = scope.get(temp.object.name);
         } else {
           leftObj = evaluate.call(this, temp.object, scope).next().value;
@@ -269,29 +266,29 @@ function* evaluate(node, scope) {
         while (!res.done) res = genRight.next(yield res.value);
         let rightValue = res.value;
 
-        if (node.operator === "=") return (leftObj[leftPropName] = rightValue);
+        if (node.operator === '=') return (leftObj[leftPropName] = rightValue);
         let leftValue = leftObj[leftPropName];
         let retVal;
         switch (node.operator) {
-          case "+=":
+          case '+=':
             retVal = leftValue + rightValue;
             break;
-          case "-=":
+          case '-=':
             retVal = leftValue - rightValue;
             break;
-          case "/=":
+          case '/=':
             retVal = leftValue / rightValue;
             break;
-          case "*=":
+          case '*=':
             retVal = leftValue * rightValue;
             break;
-          case "%=":
+          case '%=':
             retVal = leftValue % rightValue;
             break;
-          case "<<=":
+          case '<<=':
             retVal = leftValue << rightValue;
             break;
-          case ">>=":
+          case '>>=':
             retVal = leftValue >> rightValue;
             break;
         }
@@ -301,7 +298,7 @@ function* evaluate(node, scope) {
     }
 
     // 数组表达式·
-    case "ArrayExpression": {
+    case 'ArrayExpression': {
       const array = [];
       for (const element of node.elements) {
         const gen = evaluate.call(this, element, scope);
@@ -313,8 +310,8 @@ function* evaluate(node, scope) {
     }
 
     // Switch语句
-    case "SwitchStatement": {
-      const switchScope = new Scope({}, scope, "block");
+    case 'SwitchStatement': {
+      const switchScope = new Scope({}, scope, 'block');
 
       const gen = evaluate.call(this, node.discriminant, switchScope);
       let res = gen.next();
@@ -340,11 +337,11 @@ function* evaluate(node, scope) {
           }
         }
         if (flag) {
-          const caseScope = new Scope({}, switchScope, "block");
+          const caseScope = new Scope({}, switchScope, 'block');
           for (const c of case_.consequent) {
             //case如果不用{}包装起来会共享一个作用域
             const gen =
-              c.type === "BlockStatement"
+              c.type === 'BlockStatement'
                 ? evaluate.call(this, c, caseScope)
                 : evaluate.call(this, c, switchScope);
             let res = gen.next();
@@ -360,8 +357,8 @@ function* evaluate(node, scope) {
     }
 
     //while语句
-    case "WhileStatement": {
-      const whileScope = new Scope({}, scope, "block");
+    case 'WhileStatement': {
+      const whileScope = new Scope({}, scope, 'block');
       while (evaluate.call(this, node.test, whileScope).next().value) {
         const gen = evaluate.call(this, node.body, whileScope);
         let result = gen.next();
@@ -371,13 +368,13 @@ function* evaluate(node, scope) {
         result = result.value;
 
         if (result instanceof Signal) {
-          if (result.type === "continue") {
+          if (result.type === 'continue') {
             continue;
           }
-          if (result.type === "break") {
+          if (result.type === 'break') {
             break;
           }
-          if (result.type === "return") {
+          if (result.type === 'return') {
             return result;
           }
         }
@@ -386,8 +383,8 @@ function* evaluate(node, scope) {
     }
 
     //for语句
-    case "ForStatement": {
-      const forScope = new Scope({}, scope, "block");
+    case 'ForStatement': {
+      const forScope = new Scope({}, scope, 'block');
       for (
         node.init ? evaluate(node.init, forScope).next().value : null;
         node.test ? evaluate(node.test, forScope).next().value : true;
@@ -401,13 +398,13 @@ function* evaluate(node, scope) {
         result = result.value;
 
         if (result instanceof Signal) {
-          if (result.type === "continue") {
+          if (result.type === 'continue') {
             continue;
           }
-          if (result.type === "break") {
+          if (result.type === 'break') {
             break;
           }
-          if (result.type === "return") {
+          if (result.type === 'return') {
             return result;
           }
         }
@@ -416,8 +413,8 @@ function* evaluate(node, scope) {
     }
 
     // doWhile语句
-    case "DoWhileStatement": {
-      const doWhileScope = new Scope({}, scope, "block");
+    case 'DoWhileStatement': {
+      const doWhileScope = new Scope({}, scope, 'block');
 
       do {
         const gen = evaluate.call(this, node.body, doWhileScope);
@@ -427,13 +424,13 @@ function* evaluate(node, scope) {
         }
         result = result.value;
         if (result instanceof Signal) {
-          if (result.type === "continue") {
+          if (result.type === 'continue') {
             continue;
           }
-          if (result.type === "break") {
+          if (result.type === 'break') {
             break;
           }
-          if (result.type === "return") {
+          if (result.type === 'return') {
             return result;
           }
         }
@@ -443,8 +440,8 @@ function* evaluate(node, scope) {
     }
 
     // 逻辑相同，可以合并
-    case "LogicalExpression":
-    case "BinaryExpression": {
+    case 'LogicalExpression':
+    case 'BinaryExpression': {
       const gen = evaluate.call(this, node.left, scope);
       let result = gen.next();
       while (!result.done) {
@@ -460,53 +457,53 @@ function* evaluate(node, scope) {
       }
       const right = result.value;
       switch (node.operator) {
-        case "&&":
+        case '&&':
           return left && right;
-        case "||":
+        case '||':
           return left || right;
-        case "==":
+        case '==':
           return left == right;
-        case "!=":
+        case '!=':
           return left != right;
-        case "===":
+        case '===':
           return left === right;
-        case "!==":
+        case '!==':
           return left !== right;
-        case "<":
+        case '<':
           return left < right;
-        case "<=":
+        case '<=':
           return left <= right;
-        case ">":
+        case '>':
           return left > right;
-        case ">=":
+        case '>=':
           return left >= right;
-        case "<<":
+        case '<<':
           return left << right;
-        case ">>":
+        case '>>':
           return left >> right;
-        case ">>>":
+        case '>>>':
           return left >>> right;
-        case "+":
+        case '+':
           return left + right;
-        case "-":
+        case '-':
           return left - right;
-        case "*":
+        case '*':
           return left * right;
-        case "/":
+        case '/':
           return left / right;
-        case "%":
+        case '%':
           return left % right;
-        case "|":
+        case '|':
           return left | right;
-        case "^":
+        case '^':
           return left ^ right;
-        case "&":
+        case '&':
           return left & right;
-        case "in":
+        case 'in':
           return left in right;
-        case "instanceof":
+        case 'instanceof':
           return left instanceof right;
-        case "**":
+        case '**':
           return left ** right;
         default:
           return;
@@ -514,7 +511,7 @@ function* evaluate(node, scope) {
     }
 
     // 一元表达式
-    case "UnaryExpression": {
+    case 'UnaryExpression': {
       const gen = evaluate.call(this, node.argument, scope);
       let result;
       try {
@@ -523,8 +520,8 @@ function* evaluate(node, scope) {
           result = gen.next(yield result.value);
         }
       } catch (err) {
-        if (node.operator === "typeof") {
-          return "undefined";
+        if (node.operator === 'typeof') {
+          return 'undefined';
         } else {
           throw err;
         }
@@ -532,9 +529,9 @@ function* evaluate(node, scope) {
 
       const argument = result.value;
       let obj, propName;
-      if (node.operator === "delete") {
+      if (node.operator === 'delete') {
         let temp = node.argument;
-        while (temp.object === "MemberExpression") {
+        while (temp.object === 'MemberExpression') {
           temp = temp.object;
         }
 
@@ -542,35 +539,35 @@ function* evaluate(node, scope) {
         propName = temp.property.name;
       }
       switch (node.operator) {
-        case "-":
+        case '-':
           return -argument;
-        case "+":
+        case '+':
           return +argument;
-        case "!":
+        case '!':
           return !argument;
-        case "~":
+        case '~':
           return ~argument;
-        case "typeof":
+        case 'typeof':
           return typeof argument;
-        case "void":
+        case 'void':
           return void argument;
-        case "delete": {
+        case 'delete': {
           return delete obj[propName];
         }
       }
     }
 
-    case "UpdateExpression": {
-      if (node.argument.type === "MemberExpression") {
+    case 'UpdateExpression': {
+      if (node.argument.type === 'MemberExpression') {
         let obj = evaluate.call(this, node.argument.object, scope).next().value;
         let objPropName = node.argument.property.name;
 
-        if (node.operator === "++") {
+        if (node.operator === '++') {
           return node.prefix ? ++obj[objPropName] : obj[objPropName]++;
         } else {
           return node.prefix ? --obj[objPropName] : obj[objPropName]--;
         }
-      } else if (node.argument.type === "Identifier") {
+      } else if (node.argument.type === 'Identifier') {
         const gen = evaluate.call(this, node.argument, scope);
         let res = gen.next();
         while (!res.done) {
@@ -578,7 +575,7 @@ function* evaluate(node, scope) {
         }
         let preValue = res.value;
 
-        if (node.operator === "++") {
+        if (node.operator === '++') {
           scope.set(node.argument.name, preValue + 1);
           return node.prefix ? preValue + 1 : preValue;
         } else {
@@ -589,7 +586,7 @@ function* evaluate(node, scope) {
     }
 
     // 三元表达式
-    case "ConditionalExpression": {
+    case 'ConditionalExpression': {
       const gen = evaluate.call(this, node.test, scope);
       let result = gen.next();
       while (!result.done) {
@@ -607,7 +604,7 @@ function* evaluate(node, scope) {
       }
       return result.value;
     }
-    case "MemberExpression": {
+    case 'MemberExpression': {
       let obj = evaluate.call(this, node.object, scope).next().value;
       let propertyName;
 
@@ -621,7 +618,7 @@ function* evaluate(node, scope) {
       if (propValue instanceof Signal) propValue = propValue.value;
       return propValue;
     }
-    case "ObjectExpression": {
+    case 'ObjectExpression': {
       const obj = {};
       for (const property of node.properties) {
         const val = evaluate.call(this, property.value, scope).next().value;
@@ -633,36 +630,36 @@ function* evaluate(node, scope) {
           propName = property.key.name;
         }
 
-        if (property.kind === "init") {
-          if (property.value.type === "FunctionExpression") {
-            Object.defineProperty(val, "name", {
+        if (property.kind === 'init') {
+          if (property.value.type === 'FunctionExpression') {
+            Object.defineProperty(val, 'name', {
               get() {
                 return propName;
-              },
+              }
             });
           }
           obj[property.key.name] = val;
         }
-        if (property.kind === "get") {
+        if (property.kind === 'get') {
           Object.defineProperty(obj, propName, {
             get() {
               return val.call(obj);
-            },
+            }
           });
           obj[property.key.name] = val;
         }
-        if (property.kind === "set") {
+        if (property.kind === 'set') {
           Object.defineProperty(obj, propName, {
             set(value) {
               return val.call(obj, value);
-            },
+            }
           });
         }
       }
       return obj;
     }
 
-    case "CallExpression": {
+    case 'CallExpression': {
       const gen = evaluate.call(this, node.callee, scope);
       let result = gen.next();
       while (!result.done) {
@@ -680,9 +677,9 @@ function* evaluate(node, scope) {
         args.push(result.value);
       }
 
-      if (node.callee.type === "MemberExpression") {
+      if (node.callee.type === 'MemberExpression') {
         let temp = node;
-        while (temp.type === "CallExpression") {
+        while (temp.type === 'CallExpression') {
           temp = temp.callee;
         }
 
@@ -707,12 +704,12 @@ function* evaluate(node, scope) {
       1.函数声明必须有标识符，函数表达式可以省略，表达式的名字不能在外部使用
       2.函数声明会被预解析，表达式不会
     */
-    case "FunctionExpression": {
+    case 'FunctionExpression': {
       let func;
       const generator = function* (...args) {
-        const generatorScope = new Scope({}, scope, "function");
+        const generatorScope = new Scope({}, scope, 'function');
         node.params.forEach((p, i) => {
-          generatorScope.declare("let", p.name, args[i]);
+          generatorScope.declare('let', p.name, args[i]);
         });
 
         let gen = evaluate(node.body, generatorScope);
@@ -723,7 +720,7 @@ function* evaluate(node, scope) {
         }
         rightValue = rightValue.value;
 
-        if (rightValue?.type === "return") return rightValue.value;
+        if (rightValue?.type === 'return') return rightValue.value;
         else return rightValue;
       };
       //generator函数
@@ -735,9 +732,9 @@ function* evaluate(node, scope) {
         const asyncFun = function (...args) {
           return new Promise((resolve, reject) => {
             const gen = generator();
-            const asyncScope = new Scope({}, scope, "function");
+            const funcScope = new Scope({}, scope, 'function');
             node.params.forEach((param, i) => {
-              asyncScope.declare("let", param.name, args[i]);
+              funcScope.declare('let', param.name, args[i]);
             });
             function next(data) {
               try {
@@ -748,8 +745,8 @@ function* evaluate(node, scope) {
                   //当yield返回的是一个promise时，放到then里执行，使得yield后面的逻辑要等前面的执行完才行，达到同步效果
                   value.then((data) => next(data));
                 } else {
-                  // 自执行next迭代
-                  next(value);
+                  // 将后面的代码放入微任务队列
+                  Promise.resolve().then((data) => next(data));
                 }
               } catch (exception) {
                 reject(exception);
@@ -763,37 +760,37 @@ function* evaluate(node, scope) {
       }
       // 普通函数
       func = function (...args) {
-        const funcScope = new Scope({}, scope, "function");
+        const funcScope = new Scope({}, scope, 'function');
         node.params.forEach((param, i) => {
-          funcScope.declare("let", param.name, args[i]);
+          funcScope.declare('let', param.name, args[i]);
         });
 
         const gen = evaluate.call(this, node.body, funcScope);
         let res = gen.next();
         let result = res.value;
 
-        if (result instanceof Signal && result.type === "return")
+        if (result instanceof Signal && result.type === 'return')
           return result.value;
         return;
       };
-      Object.defineProperty(func, "name", {
+      Object.defineProperty(func, 'name', {
         get() {
           return node.id?.name;
-        },
+        }
       });
-      Object.defineProperty(func, "length", {
+      Object.defineProperty(func, 'length', {
         get() {
           return node.params.length;
-        },
+        }
       });
       return func;
     }
     // 箭头函数
-    case "ArrowFunctionExpression": {
+    case 'ArrowFunctionExpression': {
       const generator = function* (...args) {
-        const generatorScope = new Scope({}, scope, "function");
+        const generatorScope = new Scope({}, scope, 'function');
         node.params.forEach((p, i) => {
-          generatorScope.declare("let", p.name, args[i]);
+          generatorScope.declare('let', p.name, args[i]);
         });
 
         let gen = evaluate(node.body, generatorScope);
@@ -804,18 +801,18 @@ function* evaluate(node, scope) {
         }
         rightValue = rightValue.value;
 
-        if (rightValue?.type === "return") return rightValue.value;
+        if (rightValue?.type === 'return') return rightValue.value;
         else return rightValue;
       };
       if (!node.async) {
         return (...args) => {
-          const funScope = new Scope({}, scope, "function");
+          const funScope = new Scope({}, scope, 'function');
           node.params.forEach((param, i) => {
-            funScope.declare("let", param.name, args[i]);
+            funScope.declare('let', param.name, args[i]);
           });
           const gen = evaluate.call(this, node.body, funScope);
           let result = gen.next().value;
-          if (result instanceof Signal && result.type === "return")
+          if (result instanceof Signal && result.type === 'return')
             return result.value;
           return result;
         };
@@ -824,21 +821,18 @@ function* evaluate(node, scope) {
         return (...args) => {
           return new Promise((resolve, reject) => {
             const gen = generator();
-            const asyncScope = new Scope({}, scope, "function");
+            const asyncScope = new Scope({}, scope, 'function');
             node.params.forEach((param, i) => {
-              asyncScope.declare("let", param.name, args[i]);
+              asyncScope.declare('let', param.name, args[i]);
             });
             function next(data) {
               try {
                 const { done, value } = gen.next(data);
                 if (done) {
                   resolve(value);
-                } else if (value instanceof Promise) {
-                  //当yield返回的是一个promise时，放到then里执行，使得yield后面的逻辑要等前面的执行完才行，达到同步效果
-                  value.then((data) => next(data));
                 } else {
-                  // 自执行next迭代
-                  next(value);
+                  // 将后面的代码放入微任务队列
+                  Promise.resolve().then((data) => next(data));
                 }
               } catch (exception) {
                 reject(exception);
@@ -850,16 +844,16 @@ function* evaluate(node, scope) {
       }
     }
     // 逻辑相同可以合并
-    case "AwaitExpression":
-    case "YieldExpression": {
+    case 'AwaitExpression':
+    case 'YieldExpression': {
       const result = evaluate.call(this, node.argument, scope).next().value;
       return yield result;
     }
     // try 语句
-    case "TryStatement": {
+    case 'TryStatement': {
       let result;
       try {
-        const tryScope = new Scope({}, scope, "block");
+        const tryScope = new Scope({}, scope, 'block');
         const gen = evaluate.call(this, node.block, tryScope);
         let res = gen.next();
         while (!res.done) {
@@ -867,8 +861,8 @@ function* evaluate(node, scope) {
         }
         result = res.value;
       } catch (err) {
-        const catchScope = new Scope({}, scope, "block");
-        catchScope.declare("let", node.handler.param.name, err);
+        const catchScope = new Scope({}, scope, 'block');
+        catchScope.declare('let', node.handler.param.name, err);
         const gen = evaluate.call(this, node.handler.body, catchScope);
         let res = gen.next();
         while (!res.done) {
@@ -880,7 +874,7 @@ function* evaluate(node, scope) {
           const gen = evaluate.call(
             this,
             node.finalizer,
-            new Scope({}, scope, "block")
+            new Scope({}, scope, 'block')
           );
 
           let res = gen.next();
@@ -893,27 +887,27 @@ function* evaluate(node, scope) {
       return result;
     }
     // continue 语句
-    case "ContinueStatement": {
-      let continue_ = new Signal("continue");
+    case 'ContinueStatement': {
+      let continue_ = new Signal('continue');
       return continue_;
     }
 
     // break语句
-    case "BreakStatement": {
-      let break_ = new Signal("break");
+    case 'BreakStatement': {
+      let break_ = new Signal('break');
       return break_;
     }
     //return语句
-    case "ReturnStatement": {
+    case 'ReturnStatement': {
       const gen = evaluate.call(this, node.argument, scope);
       let result = gen.next();
       while (!result.done) {
         result = gen.next(yield result.value);
       }
-      return new Signal("return", result.value);
+      return new Signal('return', result.value);
     }
     // throw语句
-    case "ThrowStatement": {
+    case 'ThrowStatement': {
       const gen = evaluate.call(this, node.argument, scope);
       let result = gen.next();
       while (!result.done) {
@@ -922,7 +916,7 @@ function* evaluate(node, scope) {
       throw res.value;
     }
 
-    case "SequenceExpression": {
+    case 'SequenceExpression': {
       let result;
       for (const expression of node.expressions) {
         const gen = evaluate.call(this, expression, scope);
@@ -933,8 +927,8 @@ function* evaluate(node, scope) {
       }
       return result.value;
     }
-    case "NewExpression": {
-      let newScope = new Scope({}, scope, "function");
+    case 'NewExpression': {
+      let newScope = new Scope({}, scope, 'function');
       let gen = evaluate(node.callee, newScope);
       let result = gen.next();
       while (!result.done) {
@@ -953,7 +947,7 @@ function* evaluate(node, scope) {
       }
       return new (func.bind.apply(func, [null].concat(...args)))();
     }
-    case "ThisExpression": {
+    case 'ThisExpression': {
       return this !== globalThis ? this : undefined;
     }
   }
@@ -963,17 +957,17 @@ function* evaluate(node, scope) {
 }
 
 function customEval(code, scope) {
-  scope.declare("const", "module", { export: {} });
+  scope.declare('const', 'module', { export: {} });
 
   const node = acorn.parse(code, {
-    ecmaVersion: 2017,
+    ecmaVersion: 2017
   });
   const gen = evaluate(node, scope);
   gen.next();
-  return scope.get("module").exports;
+  return scope.get('module').exports;
 }
 
 module.exports = {
   customEval,
-  Scope,
+  Scope
 };

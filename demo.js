@@ -4,13 +4,16 @@ const scope = new Scope();
 
 const func = customEval(
   `
-  function test(name){
-    return "hello " + name;
+  async function foo() {
+    console.log("start");
+    await console.log('middle');
+    console.log("end");
   }
   
-  module.exports = test;
+  module.exports = foo;
 `,
   scope
 );
 
-console.log(func('Tom'));
+func();
+console.log('out');
