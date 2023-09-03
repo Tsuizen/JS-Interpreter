@@ -30,7 +30,7 @@ class Scope {
   }
 
   declare(kind, name, initValue) {
-    if (kind === "var" && name === "global") return new Value(initValue);
+    // if (kind === "var" && name === "global") return new Value(initValue);
     if (kind === "var") {
       return this.var_(name, initValue);
     } else if (kind === "let") {

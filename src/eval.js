@@ -50,7 +50,7 @@ function* evaluate(node, scope) {
       return scope.get(node.name);
     }
     case 'BlockStatement': {
-      // 预解析进行变量提升
+      // 预编译进行变量提升
       const blockScope = new Scope({}, scope, 'block');
       for (const expression of node.body) {
         if (expression.type === 'FunctionDeclaration') {
@@ -205,6 +205,7 @@ function* evaluate(node, scope) {
     case 'AssignmentExpression': {
       if (node.left.type === 'Identifier') {
         // 当操作符为=，并且未使用var let const 声明时，scope没有存储该变量，因此先执行表达式右侧获得值后使用var定义变量；
+        // TODO: 这里应该直接定义全局变量
         const genRight = evaluate.call(this, node.right, scope);
         let right = genRight.next();
         while (!right.done) {
@@ -618,6 +619,7 @@ function* evaluate(node, scope) {
       if (propValue instanceof Signal) propValue = propValue.value;
       return propValue;
     }
+
     case 'ObjectExpression': {
       const obj = {};
       for (const property of node.properties) {

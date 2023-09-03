@@ -6,6 +6,7 @@ const func = customEval(
   `
   async function foo() {
     console.log("start");
+    console.log("second");
     await console.log('middle');
     console.log("end");
   }
